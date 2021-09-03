@@ -20,6 +20,9 @@ extendr-engine = { path = "../extendr-engine", version="0.2.0" }
 ndarray = { version = "0.15.3", optional = true }
 lazy_static = "1.4"
 
+[dev-dependencies]
+seq-macro = "0.2.2"
+
 [features]
 default = []
 

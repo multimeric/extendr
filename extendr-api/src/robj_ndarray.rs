@@ -66,11 +66,49 @@ where
     type Error = Error;
 
     fn try_from(value: &ArrayBase<S, D>) -> Result<Self> {
+        // Refer to https://github.com/rust-ndarray/ndarray/issues/1060 for an excellent discussion
+        // on how to convert from `ndarray` types to R/fortran arrays
+        // This thread has informed the design decisions made here.
+
+        // In general, transposing and then iterating an ndarray in C-order (`iter()`) is exactly
+        // equivalent to iterating that same array in Fortan-order (which `ndarray` doesn't currently support)
         value
-            .as_standard_layout()
             .t()
             .iter()
+            // Since we only have a reference, we have to copy all elements so that we can own the entire R array
             .copied()
+            .collect_robj()
+            .set_attrib(
+                dim_symbol(),
+                value
+                    .shape()
+                    .iter()
+                    .map(|x| i32::try_from(*x))
+                    .collect::<std::result::Result<Vec<i32>, <i32 as TryFrom<usize>>::Error>>()
+                    .map_err(|_err| {
+                        Error::Other(String::from(
+                            "One or more array dimensions were too large to be handled by R.",
+                        ))
+                    })?,
+            )
+    }
+}
+
+impl<A, S, D> TryFrom<ArrayBase<S, D>> for Robj
+    where
+        S: Data<Elem = A>,
+        A: Copy + ToVectorValue,
+        D: Dimension,
+{
+    type Error = Error;
+
+    fn try_from(value: ArrayBase<S, D>) -> Result<Self> {
+        // Refer to the `TryFrom<&ArrayBase>` implementation for more information
+        // By comparison with that, we don't have to clone the values here to convert to R, at
+        // the cost of consuming the array
+        value
+            .t()
+            .into_iter()
             .collect_robj()
             .set_attrib(
                 dim_symbol(),
@@ -163,44 +201,70 @@ fn test_from_robj() {
 #[test]
 fn test_to_robj() {
     test! {
+        let pairs = [
+            (
         // An empty array should still convert to an empty R array with the same shape
-        assert_eq!(
-            &Robj::try_from(&Array4::<i32>::zeros((0, 1, 2, 3).f()))?,
-            &R!("array(integer(), c(0, 1, 2, 3))")?
-        );
-
-        assert_eq!(
-            &Robj::try_from(&array![1., 2., 3.])?,
-            &R!("array(c(1, 2, 3))")?
-        );
-
+                &Array4::<i32>::zeros((0, 1, 2, 3).f()),
+                "array(integer(), c(0, 1, 2, 3))"
+            ),
+            (
+                array![1., 2., 3.],
+                "array(c(1, 2, 3))"
+            ),
+            (
         // We give both R and Rust the same 1d vector and tell them both to read it as a matrix
         // in C order. Therefore these arrays should be the same.
-        assert_eq!(
-            &Robj::try_from(&Array::from_shape_vec((2, 3), vec![1., 2., 3., 4., 5., 6.]).unwrap())?,
-            &R!("matrix(c(1, 2, 3, 4, 5, 6), nrow=2, byrow=TRUE)")?
-        );
-
+                Array::from_shape_vec((2, 3), vec![1., 2., 3., 4., 5., 6.]).unwrap(),
+         "matrix(c(1, 2, 3, 4, 5, 6), nrow=2, byrow=TRUE)"
+            ),
+            (
         // We give both R and Rust the same 1d vector and tell them both to read it as a matrix
         // in fortran order. Therefore these arrays should be the same.
-        assert_eq!(
-            &Robj::try_from(&Array::from_shape_vec((2, 3).f(), vec![1., 2., 3., 4., 5., 6.]).unwrap())?,
-            &R!("matrix(c(1, 2, 3, 4, 5, 6), nrow=2, byrow=FALSE)")?
-        );
-
+                Array::from_shape_vec((2, 3).f(), vec![1., 2., 3., 4., 5., 6.]).unwrap(),
+                "matrix(c(1, 2, 3, 4, 5, 6), nrow=2, byrow=FALSE)"
+            ),
+            (
         // We give both R and Rust the same 1d vector and tell them both to read it as a 3d array
         // in fortran order. Therefore these arrays should be the same.
-        assert_eq!(
-            &Robj::try_from(&Array::from_shape_vec((1, 2, 3).f(), vec![1, 2, 3, 4, 5, 6]).unwrap())?,
-            &R!("array(1:6, c(1, 2, 3))")?
-        );
-
+                Array::from_shape_vec((1, 2, 3).f(), vec![1, 2, 3, 4, 5, 6]).unwrap(),
+                "array(1:6, c(1, 2, 3))"
+            ),
+            (
 
         // We give R a 1d vector and tell it to read it as a 3d vector
         // Then we give Rust the equivalent vector manually split out.
+                array![[[1, 5], [3, 7]], [[2, 6], [4, 8]]],
+                "array(1:8, dim=c(2, 2, 2))"
+            )
+        ];
+        // assert_eq!(
+        //     &Robj::try_from()?,
+        //     &R!()?
+        // );
+        //
+        // assert_eq!(
+        //     &Robj::try_from(&)?,
+        //     &R!("array(c(1, 2, 3))")?
+        // );
+
+        // assert_eq!(
+        //     &Robj::try_from(&)?,
+        //     &R!()?
+        // );
+
         assert_eq!(
-            &Robj::try_from(&array![[[1, 5], [3, 7]], [[2, 6], [4, 8]]])?,
-            &R!("array(1:8, dim=c(2, 2, 2))")?
+            &Robj::try_from(&)?,
+            &R!()?
+        );
+
+        assert_eq!(
+            &Robj::try_from(&)?,
+            &R!()?
+        );
+
+        assert_eq!(
+            &Robj::try_from(&)?,
+            &R!()?
         );
     }
 }
