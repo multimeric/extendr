@@ -72,7 +72,7 @@ mod test {
                 "b" => &[1., 2., 3., 4.],
                 "c" => &["1", "2", "3", "4"]
             ).unwrap();
-            println!("{}", df);
+
             let df_robj: &Robj = &df.try_into().unwrap();
 
             // Check for the right subclass
