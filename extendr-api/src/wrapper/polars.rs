@@ -130,12 +130,16 @@ mod test {
 
     #[test]
     fn test_df_to_robj() {
+
+        // To run this test
+        // cargo +nightly test --features polars-wrapper --package extendr-api --lib wrapper::polars::test::test_df_to_robj
         test! {
             let df = df!(
                 "a" => &[1, 2, 3, 4],
                 "b" => &[1., 2., 3., 4.],
                 "c" => &["1", "2", "3", "4"]
             ).unwrap();
+
             let df_robj: &Robj = &df.try_into().unwrap();
 
             // Check for the right subclass
