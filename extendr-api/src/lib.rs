@@ -293,6 +293,7 @@ pub mod na;
 
 #[cfg(feature = "ndarray")]
 pub mod robj_ndarray;
+mod grobj;
 
 pub use std::convert::{TryFrom, TryInto};
 pub use std::ops::Deref;
