@@ -49,7 +49,7 @@ where
                 let res = make_lang("stop");
                 let mut tail = res.get();
                 append_lang!(tail, "error!");
-                res
+                res.eval_blind()
             }
             Ok(ok) => ok.into()
 
