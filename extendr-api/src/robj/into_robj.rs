@@ -46,7 +46,7 @@ where
     fn from(res: Result<T>) -> Self {
         return match res {
             Err(_e) => {
-                lang!("stop('error!')").eval_blind()
+                lang!("stop, 'error!'").eval_blind()
             }
             Ok(ok) => ok.into()
 
