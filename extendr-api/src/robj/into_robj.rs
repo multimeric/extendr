@@ -45,8 +45,11 @@ where
 {
     fn from(res: Result<T>) -> Self {
         return match res {
-            Err(_e) => {
-                lang!("stop", "error!").eval_blind()
+            Err(_e) => unsafe {
+                let res = make_lang("stop");
+                let mut tail = res.get();
+                append_lang!(tail, "error!");
+                res
             }
             Ok(ok) => ok.into()
 
